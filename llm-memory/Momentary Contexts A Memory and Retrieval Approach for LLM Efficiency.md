@@ -26,6 +26,23 @@ This study explores the design principles and implementation strategies of this 
 
 
 
+## Philosophical Motivation: A Wittgensteinian Perspective
+
+Ludwig Wittgenstein’s well-known proposition that *“The world is the totality of facts, not of things”* provides a philosophical lens through which we can interpret the proposed framework. This statement suggests that knowledge and meaning emerge not merely from the accumulation of discrete entities (things), but rather from how these entities form meaningful facts within a context. In our approach, the concept of **momentarily reconstructed minimal contexts** resonates with this perspective:
+
+1. **From Accumulation of Tokens to Meaningful Facts**:
+   Traditional LLM architectures often accumulate all previously seen tokens, treating past information as a static and undifferentiated mass. By contrast, our method views the retrieval and reconstruction of context as the dynamic selection of **relevant facts**. Instead of continuously expanding a context window with every token (thing), we extract only those pieces of information that form coherent, meaningful facts pertinent to the current query. This shift mirrors Wittgenstein’s distinction between raw data (things) and facts—structured, contextually significant information.
+
+2. **Language as Contextual Meaning: The Language Game Analogy**:
+   Wittgenstein’s notion of “language games” highlights that meanings arise from use within specific contexts and activities. Similarly, our reconstructed context adapts to the evolving conversational “rules” at each query turn. By always including the most recent memory and selectively retrieving relevant past pieces, we ensure that the model’s output emerges from the interplay of contextually grounded facts, much like participants in a language game continually adjust their understanding based on evolving conversational norms.
+
+3. **Dynamic Knowledge Formation**:
+   Under Wittgenstein’s philosophy, meaning is not a fixed property of words or sentences; it is constituted by their usage within contexts. Our retrieval-based framework treats knowledge not as a static repository of tokens, but as a dynamic process of fact selection and contextual integration. Every momentary reconstruction of context is an act of meaning-making, aligning with the Wittgensteinian view that the significance of information depends on its role in a particular language game.
+
+By drawing on Wittgenstein’s philosophical insights, we frame our technical contributions within a broader intellectual context: the proposed system does not merely optimize for efficiency or coherence, but also reflects a deeper understanding of how meaning and relevance emerge from the dynamic interplay of facts rather than the mere accumulation of tokens.
+
+
+
 ## Limitations of Cumulative Context in Attention Mechanisms
 
 In traditional cumulative context models, the attention mechanism distributes weights across all input tokens, leading to:
