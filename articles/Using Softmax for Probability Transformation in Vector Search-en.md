@@ -11,7 +11,7 @@ Modern search systems often combine **vector search** (dense embedding retrieval
 
 The solution is to apply a **probability transformation** to the scores so that both vector and text results are represented in a common probabilistic scale. By converting scores into probabilities of relevance, we can combine and rank documents from different sources in a principled way. This approach is grounded in the **Probability Ranking Principle (PRP)** of information retrieval, which states that documents should be ordered by decreasing probability of relevance to the query [[cseweb.ucsd.edu]](https://cseweb.ucsd.edu/~rik/foa/l2h/foa-5-5-1.html#:~:text=FOA%3A%205,of%20decreasing%20probability%20of%20relevance). In other words, if we can estimate a probability that each document is relevant, we should rank by that.
 
-In this blog post, we will focus on using the **softmax function** to transform similarity scores into probabilities for vector search. We will also compare softmax normalization to other methods like min-max scaling, sigmoid transformation, and Platt scaling, and show how these help in **hybrid search** (combining BM25/TF-IDF with vector search). The content is aimed at intermediate to advanced engineers, with a rigorous mathematical perspective and practical examples in Python.
+In this article, we will focus on using the **softmax function** to transform similarity scores into probabilities for vector search. We will also compare softmax normalization to other methods like min-max scaling, sigmoid transformation, and Platt scaling, and show how these help in **hybrid search** (combining BM25/TF-IDF with vector search). The content is aimed at intermediate to advanced engineers, with a rigorous mathematical perspective and practical examples in Python.
 
 ## Mathematical Theory
 
@@ -232,7 +232,7 @@ After fusion, you have a single list of documents with combined probability scor
 
 A big advantage of converting to probabilities and then combining is **seamless integration**: each system contributes according to how confident it is. For example, if the BM25 subsystem finds an exact match (making one document’s BM25-softmax probability $0.9$), and the embedding subsystem finds only loosely related documents (its probabilities are spread out, say max $0.4$), a sensible $\alpha$ will ensure the exact match is ranked first because $0.9$ from BM25 outweighs the others. Conversely, if BM25 finds nothing (all low scores) but the embedding finds a very relevant doc, the probabilities will reflect that, and the embedding result can take the top spot. Softmax here is crucial because it naturally **scales the scores**: a BM25 score of $15$ vs. $10$ might turn into probabilities $0.85$ vs. $0.15$ (very confident distinction), whereas an embedding score of $0.85$ vs. $0.8$ might turn into probabilities like $0.52$ vs. $0.48$ (nearly tied). These normalized values give a meaningful way to compare the confidence of the two systems. In fact, research has noted patterns like: when BM25 scores are high (strong lexical overlap), the softmax-normalized BM25 probability for the top doc is very high (approximately $0.8$–$1$), but when lexical scores are low, that probability is much lower [[arxiv.org]](https://arxiv.org/pdf/2009.10791#:~:text=top%20BM25%20score%20,g). The hybrid system can use this information to lean on the vector search in the latter case.
 
-**Score fusion example:** Suppose BM25 returns Document A with score $12$ and Document B with score $8$ for a query, while the vector search returns Document B with similarity $0.90$ and Document C with $0.85$. These raw scores aren't directly comparable. If we softmax-normalize, BM25 might give $P(A)=0.88$, $P(B)=0.12$; the vector side might give $P(B)=0.53$, $P(C)=0.47$. Now if we take a simple average ($\alpha=0.5$), Document A gets combined probability $0.44$ ($0.88 \times 0.5$ from BM25 + $0$ from vector since A wasn’t in vector list), Document B gets $0.325$ ($0.06 + 0.265$), and Document C gets $0.235$ ($0 + 0.235$). In this case, Document A would still rank #1 (because BM25 was very confident about A), but Document B comes next, benefiting from being present in both lists, and Document C is third. If we had instead multiplied probabilities, Document A would get $0$ (since it had $0$ from vector), Document B would get $0.12 \times 0.53 = 0.0636$, and Document C $0$ (since $0$ from BM25), and after renormalizing, Document B would be top (A and C would essentially be dropped). This shows how different fusion strategies can dramatically affect results – weighted sum is more forgiving, while product is stricter.
+**Score fusion example:** Suppose BM25 returns Document A with score $12$ and Document B with score $8$ for a query, while the vector search returns Document B with similarity $0.90$ and Document C with $0.85$. These raw scores aren't directly comparable. If we softmax-normalize, BM25 might give $P(A)=0.88$, $P(B)=0.12$; the vector side might give $P(B)=0.53$, $P(C)=0.47$. Now if we take a simple average ($\alpha=0.5$), Document A gets combined probability $0.44$ ($0.88 \times 0.5$ from BM25 + $0$ from vector since A wasn’t in vector list), Document B gets $0.325$ ($0.06 + 0.265$), and Document C gets $0.235$ ($0 + 0.235$). In this case, Document A would still rank #1 (because BM25 was very confident about A), but Document B comes next, benefiting from being present in both lists, and Document C is third. If we had instead multiplied probabilities, Document A would get $0$ (since it had $0$ from vector), Document B would get $0.12 \times 0.53 = 0.0636$, and Document C would get $0$ (since $0$ from BM25), and after renormalizing, Document B would be top (A and C would essentially be dropped). This shows how different fusion strategies can dramatically affect results – weighted sum is more forgiving, while product is stricter.
 
 In practice, **tuning the fusion parameters** (like $\alpha$ or the decision to multiply vs. add) is important. Many systems simply try a few weights and pick one that maximizes validation set performance. Many systems, such as OpenSearch’s hybrid search, even provide an automated optimization to find the best global weights and normalization technique for a given dataset [[opensearch.org]](https://opensearch.org/blog/hybrid-search-optimization/#:~:text=Finding%20the%20right%20hybrid%20search,configuration%20can%20be%20difficult) [[opensearch.org]](https://opensearch.org/blog/hybrid-search-optimization/#:~:text=,ranging%20from%200%20to%201). The good news is that by using probability-based scores, these parameters tend to generalize better than if we were combining raw scores, because the ranges and meanings are aligned.
 
@@ -284,6 +284,16 @@ for T in [0.5, 1.0, 2.0]:
 
 ```python
 import numpy as np
+
+def softmax(scores, temperature=1.0):
+    """Compute softmax probabilities with an optional temperature scaling."""
+    scores = np.array(scores, dtype=float)
+    # Apply temperature scaling
+    scaled_scores = scores / temperature
+    # Subtract max for numerical stability (optional but good practice)
+    scaled_scores -= np.max(scaled_scores)
+    exp_scores = np.exp(scaled_scores)
+    return exp_scores / np.sum(exp_scores)
 
 # Example BM25 and vector search scores for a query
 bm25_scores = {
@@ -370,7 +380,7 @@ In this post, we explored the use of softmax for probability transformation in v
 
 We compared softmax normalization to other approaches:
 
-- **Min-max normalization** linearly scales scores to $[0,1]$ without giving them probabilistic meaning, but it’s simple and used in systems like OpenSearch for hybrid score blending.
+- **Min-max normalization** linearly scales scores to $[0, 1]$ without giving them probabilistic meaning, but it’s simple and used in systems like OpenSearch for hybrid score blending.
 - **Sigmoid (logistic) transformation** provides independent probabilities for each result, suitable when multiple results can be relevant. It doesn’t enforce a fixed sum, which aligns with the reality of search (many documents can be relevant). However, it typically requires calibration or good parameter choices to yield meaningful probabilities.
 - **Platt scaling** takes calibration to the next level by learning a mapping from scores to probabilities using logistic regression. This can yield accurate probability estimates of relevance if you have training data, enabling theoretically optimal ranking by probability. The trade-off is the need for labeled data and the assumption that the score-to-relevance mapping is consistent.
 
